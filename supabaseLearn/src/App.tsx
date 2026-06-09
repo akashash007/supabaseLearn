@@ -9,12 +9,12 @@ function App() {
 
   const [session, setSession] = useState<any>(null)
 
-  const fetchSession = async () => {
-    const currentSession = await supabase.auth.getSession()
-    console.log("Current session:", currentSession.data.session)
-    setSession(currentSession.data.session)
+  // const fetchSession = async () => {
+  //   const currentSession = await supabase.auth.getSession()
+  //   console.log("Current session:", currentSession.data.session)
+  //   setSession(currentSession.data.session)
 
-  }
+  // }
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {

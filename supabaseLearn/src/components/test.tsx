@@ -34,9 +34,17 @@ export const Test = () => {
     }, []);
 
     const handleAddTask = async (e: any) => {
-
         e.preventDefault();
-        const { data: { user } } = await supabase.auth.getUser();
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            alert("Please login first");
+            return;
+        }
+
         if (editId) {
             const { error } = await supabase
                 .from("tasks")
@@ -44,8 +52,7 @@ export const Test = () => {
                     title: taskTitle,
                     description: taskDescription,
                 })
-                .eq("id", editId)
-                .select("*");
+                .eq("id", editId);
 
             if (error) {
                 console.error(error);
@@ -54,15 +61,13 @@ export const Test = () => {
 
             setEditId(null);
         } else {
-
             const { error } = await supabase
                 .from("tasks")
                 .insert({
                     title: taskTitle,
                     description: taskDescription,
-                    user_id: user.id
-                })
-                .select("*");
+                    user_id: user.id, // No TS error now
+                });
 
             if (error) {
                 console.error(error);
@@ -72,10 +77,7 @@ export const Test = () => {
 
         setTaskTitle("");
         setTaskDescription("");
-
         getTasks();
-
-        // Add Supabase insert logic here
     };
 
     const handleEdit = (task: any) => {
