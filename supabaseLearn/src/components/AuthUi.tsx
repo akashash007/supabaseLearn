@@ -1,159 +1,193 @@
 import { useState } from "react";
 import { supabase } from "../supabase-client";
 
+interface FieldErrors {
+    email?: string;
+    password?: string;
+}
+
+interface Toast {
+    id: number;
+    type: "success" | "error";
+    message: string;
+}
+
+let toastId = 0;
+
 export const AuthUI = () => {
     const [mode, setMode] = useState<"login" | "signup">("login");
-
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [errors, setErrors] = useState<FieldErrors>({});
+    const [loading, setLoading] = useState(false);
+    const [toasts, setToasts] = useState<Toast[]>([]);
+    const [apiError, setApiError] = useState<string | null>(null);
 
-    const validate = () => {
-        if (!email) {
-            alert("Email is required");
-            return false;
-        }
-
-        if (!email.includes("@")) {
-            alert("Enter a valid email");
-            return false;
-        }
-
-        if (!password) {
-            alert("Password is required");
-            return false;
-        }
-
-        if (password.length < 6) {
-            alert("Password must be at least 6 characters");
-            return false;
-        }
-
-        return true;
+    const addToast = (type: "success" | "error", message: string) => {
+        const id = ++toastId;
+        setToasts((prev) => [...prev, { id, type, message }]);
+        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
     };
 
-    const handleSubmit = async (e: any) => {
-        e.preventDefault();
+    const validate = (): boolean => {
+        const errs: FieldErrors = {};
+        if (!email) errs.email = "Email is required";
+        else if (!email.includes("@")) errs.email = "Enter a valid email address";
+        if (!password) errs.password = "Password is required";
+        else if (password.length < 6) errs.password = "At least 6 characters required";
+        setErrors(errs);
+        return Object.keys(errs).length === 0;
+    };
 
+    const handleSubmit = async () => {
         if (!validate()) return;
+        setLoading(true);
+        setApiError(null);
 
         if (mode === "signup") {
-            const { error } = await supabase.auth.signUp({
-                email,
-                password,
-            });
-
+            const { error } = await supabase.auth.signUp({ email, password });
             if (error) {
-                console.error("Signup error:", error.message);
-                return;
+                setApiError(error.message);
+            } else {
+                addToast("success", "Account created — check your email!");
             }
-
-            alert("Signup successful");
+        } else {
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) {
+                setApiError("Incorrect email or password.");
+            }
         }
 
-        if (mode === "login") {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
+        setLoading(false);
+    };
 
-            if (error) {
-                console.error("Login error:", error.message);
-                return;
-            }
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") handleSubmit();
+    };
 
-            alert("Login successful");
-        }
-
-        console.log({ email, password, mode });
+    const switchMode = () => {
+        setMode(mode === "login" ? "signup" : "login");
+        setErrors({});
+        setApiError(null);
     };
 
     return (
-        <div
-            style={{
-                maxWidth: "400px",
-                margin: "60px auto",
-                padding: "20px",
-                border: "1px solid #ddd",
-                borderRadius: "10px",
-            }}
-        >
-            <h2 style={{ textAlign: "center" }}>
-                {mode === "login" ? "Login" : "Signup"}
-            </h2>
+        <>
+            <div className="auth-page">
+                <div className="auth-card">
+                    {/* Brand */}
+                    <div className="auth-logo">
+                        <div className="auth-logo-mark">✦</div>
+                        <span className="auth-logo-text">Taskflow</span>
+                    </div>
 
-            <form onSubmit={handleSubmit}>
-                {/* EMAIL */}
-                <div style={{ marginBottom: "15px" }}>
-                    <label>Email</label>
-                    <input
-                        type="text"
-                        value={email}
-                        placeholder="Enter email"
-                        onChange={(e) => setEmail(e.target.value)}
-                        style={{
-                            width: "100%",
-                            padding: "10px",
-                            marginTop: "5px",
-                        }}
-                    />
+                    <h1 className="auth-title">
+                        {mode === "login" ? "Welcome back" : "Create account"}
+                    </h1>
+                    <p className="auth-subtitle">
+                        {mode === "login"
+                            ? "Sign in to manage your tasks"
+                            : "Get started — it only takes a moment"}
+                    </p>
+
+                    {/* API-level error */}
+                    {apiError && (
+                        <div className="inline-error" role="alert">
+                            <span>⚠</span> {apiError}
+                        </div>
+                    )}
+
+                    {/* Email */}
+                    <div className="form-group">
+                        <label className="form-label" htmlFor="auth-email">
+                            Email
+                        </label>
+                        <input
+                            id="auth-email"
+                            className="form-input"
+                            type="email"
+                            autoComplete="email"
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(e) => {
+                                setEmail(e.target.value);
+                                if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
+                            }}
+                            onKeyDown={handleKeyDown}
+                            aria-describedby={errors.email ? "email-err" : undefined}
+                            aria-invalid={!!errors.email}
+                        />
+                        {errors.email && (
+                            <p className="field-error" id="email-err" role="alert">
+                                {errors.email}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Password */}
+                    <div className="form-group">
+                        <label className="form-label" htmlFor="auth-password">
+                            Password
+                        </label>
+                        <input
+                            id="auth-password"
+                            className="form-input"
+                            type="password"
+                            autoComplete={mode === "login" ? "current-password" : "new-password"}
+                            placeholder={mode === "login" ? "Your password" : "Min 6 characters"}
+                            value={password}
+                            onChange={(e) => {
+                                setPassword(e.target.value);
+                                if (errors.password) setErrors((p) => ({ ...p, password: undefined }));
+                            }}
+                            onKeyDown={handleKeyDown}
+                            aria-describedby={errors.password ? "pw-err" : undefined}
+                            aria-invalid={!!errors.password}
+                        />
+                        {errors.password && (
+                            <p className="field-error" id="pw-err" role="alert">
+                                {errors.password}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Submit */}
+                    <button
+                        className="btn btn-primary btn-block"
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        aria-label={mode === "login" ? "Sign in" : "Create account"}
+                        style={{ marginTop: "8px" }}
+                    >
+                        {loading ? (
+                            <>
+                                <span className="spinner" />
+                                {mode === "login" ? "Signing in…" : "Creating account…"}
+                            </>
+                        ) : (
+                            mode === "login" ? "Sign in" : "Create account"
+                        )}
+                    </button>
+
+                    {/* Switch mode */}
+                    <p className="auth-footer">
+                        {mode === "login" ? "No account? " : "Already have one? "}
+                        <button className="auth-footer-link" onClick={switchMode}>
+                            {mode === "login" ? "Sign up" : "Sign in"}
+                        </button>
+                    </p>
                 </div>
+            </div>
 
-                {/* PASSWORD */}
-                <div style={{ marginBottom: "15px" }}>
-                    <label>Password</label>
-                    <input
-                        type="password"
-                        value={password}
-                        placeholder="Enter password"
-                        onChange={(e) => setPassword(e.target.value)}
-                        style={{
-                            width: "100%",
-                            padding: "10px",
-                            marginTop: "5px",
-                        }}
-                    />
-                </div>
-
-                {/* SUBMIT */}
-                <button
-                    type="submit"
-                    style={{
-                        width: "100%",
-                        padding: "10px",
-                        background: "#111",
-                        color: "#fff",
-                        border: "none",
-                        cursor: "pointer",
-                    }}
-                >
-                    {mode === "login" ? "Login" : "Signup"}
-                </button>
-            </form>
-
-            {/* SWITCH MODE */}
-            <p style={{ textAlign: "center", marginTop: "15px" }}>
-                {mode === "login" ? (
-                    <>
-                        Don't have an account?{" "}
-                        <span
-                            style={{ color: "blue", cursor: "pointer" }}
-                            onClick={() => setMode("signup")}
-                        >
-                            Signup
-                        </span>
-                    </>
-                ) : (
-                    <>
-                        Already have an account?{" "}
-                        <span
-                            style={{ color: "blue", cursor: "pointer" }}
-                            onClick={() => setMode("login")}
-                        >
-                            Login
-                        </span>
-                    </>
-                )}
-            </p>
-        </div>
+            {/* Toasts */}
+            <div className="toast-container" aria-live="polite">
+                {toasts.map((t) => (
+                    <div key={t.id} className={`toast toast-${t.type}`} role="status">
+                        <span className="toast-dot" />
+                        {t.message}
+                    </div>
+                ))}
+            </div>
+        </>
     );
 };

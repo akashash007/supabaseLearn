@@ -1,49 +1,56 @@
 import { useState, useEffect } from "react";
 import "./App.css";
 import { AuthUI } from "./components/AuthUi";
-import { Test } from "./components/test";
 import { supabase } from "./supabase-client";
-
+import { TaskManager } from "./components/TaskManager";
 
 function App() {
+  const [session, setSession] = useState<any>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
-  const [session, setSession] = useState<any>(null)
-
-  // const fetchSession = async () => {
-  //   const currentSession = await supabase.auth.getSession()
-  //   console.log("Current session:", currentSession.data.session)
-  //   setSession(currentSession.data.session)
-
-  // }
   useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-      }
-    );
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => listener.subscription.unsubscribe();
   }, []);
 
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    await supabase.auth.signOut();
+    setSigningOut(false);
+  };
+
+  if (!session) {
+    return <AuthUI />;
+  }
+
   return (
-    <>
-      {session ? (
-        <>
-          <div>
-            <h1>Welcome, {session.user.email}!</h1>
-            <button onClick={() => supabase.auth.signOut()}>Sign Out</button>
-          </div>
-          <Test />
-        </>
-      ) : (
-        <>
-          <h1>Please log in or sign up.</h1>
-          <AuthUI />
-        </>
-      )}
-    </>
+    <div className="app-shell">
+      {/* Nav */}
+      <nav className="app-nav" role="navigation" aria-label="Main navigation">
+        <div className="nav-brand">
+          <span className="nav-brand-dot" />
+          Taskflow
+        </div>
+        <div className="nav-user">
+          <span className="nav-email" title={session.user.email}>
+            {session.user.email}
+          </span>
+          <button
+            className="btn btn-signout"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            aria-label="Sign out"
+          >
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
+        </div>
+      </nav>
+
+      {/* Content */}
+      <TaskManager />
+    </div>
   );
 }
 
